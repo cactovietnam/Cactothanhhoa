@@ -1,43 +1,45 @@
 -- ================================================
 --         NGUYEN CUTO - Catch a Monster Tool
---         Server Hop + Auto Egg Hatch
+--         Update: New Theme & Egg Timer (1-30s)
 -- ================================================
 
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local RS = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local placeId = game.PlaceId
 
--- =================== CÀI ĐẶT ===================
+-[span_0](start_span)- =================== CÀI ĐẶT[span_0](end_span) ===================
 local MIN_PLAYERS     = 5
 local DETECT_RADIUS   = 40
 local CHECK_INTERVAL  = 5
-local EGG_INTERVAL    = 15
+local EGG_INTERVAL    = 15 -- Mặc định 15s, có thể chỉnh 1-30s qua UI
 local AUTO_HOP        = false
 local AUTO_EGG        = true
-local TARGET_EGG      = "Frostwyrm's Egg"
+[span_1](start_span)local TARGET_EGG      = "Frostwyrm's Egg"[span_1](end_span)
 local recentServers   = {}
 
--- =================== LƯU VỊ TRÍ ===================
-local SAVE_FILE = "NguyenCuto.json"
+-[span_2](start_span)- =================== LƯU VỊ TRÍ[span_2](end_span) ===================
+local SAVE_FILE = "NguyenCutoPos.json"
 local function savePos(pos)
     pcall(function()
         writefile(SAVE_FILE, HttpService:JSONEncode({x=pos.X.Offset, y=pos.Y.Offset}))
     end)
 end
+
 local function loadPos()
     local ok, c = pcall(function() return readfile(SAVE_FILE) end)
     if ok and c then
         local ok2, d = pcall(function() return HttpService:JSONDecode(c) end)
         if ok2 and d then return UDim2.new(0, d.x, 0, d.y) end
     end
-    return UDim2.new(0, 10, 0.5, -200)
+    [span_3](start_span)return UDim2.new(0, 10, 0.5, -200)[span_3](end_span)
 end
 
--- =================== XÓA GUI CŨ ===================
+-[span_4](start_span)- =================== XÓA GUI CŨ[span_4](end_span) ===================
 local oldGui = player.PlayerGui:FindFirstChild("NguyenCutoGui")
 if oldGui then oldGui:Destroy() end
 if not player.Character then player.CharacterAdded:Wait() end
@@ -47,552 +49,167 @@ task.wait(1)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "NguyenCutoGui"
 screenGui.ResetOnSpawn = false
-screenGui.Enabled = true
 screenGui.Parent = player.PlayerGui
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 420)
+-- NÚT KHOANH ĐỎ (CÔNG TẮC BẬT TẮT UI)
+local toggleBtn = Instance.new("ImageButton")
+toggleBtn.Name = "ToggleUI"
+toggleBtn.Size = UDim2.new(0, 45, 0, 45)
+toggleBtn.Position = UDim2.new(0, 10, 0, 10)
+toggleBtn.Image = "rbxassetid://1777515689830" -- Ảnh công tắc khoanh đỏ
+toggleBtn.BackgroundTransparency = 1
+toggleBtn.Parent = screenGui
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+
+-- HIỆU ỨNG THU NHỎ NÚT KHOANH ĐỎ (ĐỂ KHÔNG MẤT ẢNH)
+toggleBtn.MouseEnter:Connect(function()
+    TweenService:Create(toggleBtn, TweenInfo.new(0.3), {Size = UDim2.new(0, 45, 0, 45)}):Play()
+end)
+toggleBtn.MouseLeave:Connect(function()
+    TweenService:Create(toggleBtn, TweenInfo.new(0.3), {Size = UDim2.new(0, 30, 0, 30)}):Play()
+end)
+
+-- KHUNG KHOANH TRẮNG (UI CHỨC NĂNG)
+local frame = Instance.new("ImageLabel")
+frame.Name = "MainFrame"
+frame.Size = UDim2.new(0, 240, 0, 460)
 frame.Position = loadPos()
-frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-frame.BorderSizePixel = 0
+frame.Image = "rbxassetid://32856190" -- Ảnh UI khoanh trắng
+frame.ScaleType = Enum.ScaleType.Stretch
+frame.Active = true
+frame.Draggable = true -- Có thể kéo nhưng không mất ảnh của người
 frame.Parent = screenGui
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
--- Viền ngoài
-local stroke = Instance.new("UIStroke", frame)
-stroke.Color = Color3.fromRGB(80, 80, 80)
-stroke.Thickness = 1
+-- Ẩn hiện UI chính
+toggleBtn.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+end)
 
--- =================== TITLE 7 MÀU ===================
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 36)
-titleBar.Position = UDim2.new(0, 0, 0, 0)
-titleBar.BackgroundTransparency = 1
-titleBar.Parent = frame
-
+-[span_5](start_span)- =================== TITLE 7 MÀU[span_5](end_span) ===================
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 1, 0)
+titleLabel.Size = UDim2.new(1, 0, 0, 36)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "NGUYEN CUTO"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextScaled = true
 titleLabel.Font = Enum.Font.GothamBold
-titleLabel.Parent = titleBar
+titleLabel.Parent = frame
 
--- Rainbow title
-local rainbowColors = {
-    Color3.fromRGB(255,0,0),
-    Color3.fromRGB(255,165,0),
-    Color3.fromRGB(255,255,0),
-    Color3.fromRGB(0,255,0),
-    Color3.fromRGB(0,150,255),
-    Color3.fromRGB(75,0,130),
-    Color3.fromRGB(200,0,200),
-}
-local colorIdx = 1
 task.spawn(function()
+    local colors = {
+        Color3.fromRGB(255,0,0), Color3.fromRGB(255,165,0), Color3.fromRGB(255,255,0),
+        Color3.fromRGB(0,255,0), Color3.fromRGB(0,150,255), Color3.fromRGB(200,0,200)
+    }
+    local idx = 1
     while task.wait(0.3) do
-        if titleLabel and titleLabel.Parent then
-            titleLabel.TextColor3 = rainbowColors[colorIdx]
-            colorIdx = colorIdx % #rainbowColors + 1
-        end
+        titleLabel.TextColor3 = colors[idx]
+        [span_6](start_span)idx = idx % #colors + 1[span_6](end_span)
     end
 end)
 
--- Divider
-local div0 = Instance.new("Frame")
-div0.Size = UDim2.new(1, -20, 0, 1)
-div0.Position = UDim2.new(0, 10, 0, 38)
-div0.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-div0.BorderSizePixel = 0
-div0.Parent = frame
+-[span_7](start_span)- =================== CHỨC NĂNG[span_7](end_span) ===================
+local container = Instance.new("ScrollingFrame")
+container.Size = UDim2.new(1, -20, 1, -50)
+container.Position = UDim2.new(0, 10, 0, 40)
+container.BackgroundTransparency = 1
+container.ScrollBarThickness = 2
+container.Parent = frame
 
--- =================== MỤC 1: HOP SERVER ===================
-local sec1Label = Instance.new("TextLabel")
-sec1Label.Size = UDim2.new(1, -20, 0, 20)
-sec1Label.Position = UDim2.new(0, 10, 0, 44)
-sec1Label.BackgroundTransparency = 1
-sec1Label.Text = "[ HOP SERVER ]"
-sec1Label.TextColor3 = Color3.fromRGB(0, 200, 255)
-sec1Label.TextScaled = true
-sec1Label.Font = Enum.Font.GothamBold
-sec1Label.TextXAlignment = Enum.TextXAlignment.Left
-sec1Label.Parent = frame
+local layout = Instance.new("UIListLayout", container)
+layout.Padding = UDim.new(0, 8)
 
--- Status hop
-local hopStatus = Instance.new("TextLabel")
-hopStatus.Size = UDim2.new(1, -20, 0, 18)
-hopStatus.Position = UDim2.new(0, 10, 0, 66)
-hopStatus.BackgroundTransparency = 1
-hopStatus.Text = "⏸ Sẵn sàng..."
-hopStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
-hopStatus.TextScaled = true
-hopStatus.Font = Enum.Font.Gotham
-hopStatus.TextXAlignment = Enum.TextXAlignment.Left
-hopStatus.Parent = frame
+-- 1. CHỌN THỜI GIAN CHECK TRỨNG (1-30 GIÂY)
+local timerLabel = Instance.new("TextLabel")
+timerLabel.Size = UDim2.new(1, 0, 0, 20)
+timerLabel.Text = "⏱ Thời gian check trứng (1-30s):"
+timerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+timerLabel.BackgroundTransparency = 1
+timerLabel.TextScaled = true
+timerLabel.TextXAlignment = Enum.TextXAlignment.Left
+timerLabel.Parent = container
 
--- Monster status
-local monStatus = Instance.new("TextLabel")
-monStatus.Size = UDim2.new(1, -20, 0, 18)
-monStatus.Position = UDim2.new(0, 10, 0, 86)
-monStatus.BackgroundTransparency = 1
-monStatus.Text = "🔍 Đang kiểm tra..."
-monStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
-monStatus.TextScaled = true
-monStatus.Font = Enum.Font.Gotham
-monStatus.TextXAlignment = Enum.TextXAlignment.Left
-monStatus.Parent = frame
+local timerInput = Instance.new("TextBox")
+timerInput.Size = UDim2.new(1, 0, 0, 30)
+timerInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+timerInput.Text = tostring(EGG_INTERVAL)
+timerInput.TextColor3 = Color3.fromRGB(0, 255, 0)
+timerInput.Font = Enum.Font.Gotham
+timerInput.Parent = container
+Instance.new("UICorner", timerInput)
 
--- Check interval input label
-local intervalLabel = Instance.new("TextLabel")
-intervalLabel.Size = UDim2.new(0, 100, 0, 24)
-intervalLabel.Position = UDim2.new(0, 10, 0, 108)
-intervalLabel.BackgroundTransparency = 1
-intervalLabel.Text = "⏱ Check (s):"
-intervalLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-intervalLabel.TextScaled = true
-intervalLabel.Font = Enum.Font.Gotham
-intervalLabel.TextXAlignment = Enum.TextXAlignment.Left
-intervalLabel.Parent = frame
-
-local intervalBox = Instance.new("TextBox")
-intervalBox.Size = UDim2.new(0, 60, 0, 24)
-intervalBox.Position = UDim2.new(0, 115, 0, 108)
-intervalBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-intervalBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-intervalBox.Text = tostring(CHECK_INTERVAL)
-intervalBox.TextScaled = true
-intervalBox.Font = Enum.Font.Gotham
-intervalBox.Parent = frame
-Instance.new("UICorner", intervalBox).CornerRadius = UDim.new(0, 6)
-Instance.new("UIStroke", intervalBox).Color = Color3.fromRGB(60,60,60)
-
-intervalBox.FocusLost:Connect(function()
-    local val = tonumber(intervalBox.Text)
-    if val and val >= 1 then
-        CHECK_INTERVAL = val
-        print("✅ Check interval: " .. val .. "s")
+timerInput.FocusLost:Connect(function()
+    local val = tonumber(timerInput.Text)
+    if val and val >= 1 and val <= 30 then
+        EGG_INTERVAL = val
+        print("✅ Đã cập nhật thời gian check: " .. val .. " giây")
     else
-        intervalBox.Text = tostring(CHECK_INTERVAL)
+        timerInput.Text = tostring(EGG_INTERVAL)
     end
 end)
 
--- Nút Auto Hop
-local autoHopBtn = Instance.new("TextButton")
-autoHopBtn.Size = UDim2.new(1, -20, 0, 28)
-autoHopBtn.Position = UDim2.new(0, 10, 0, 136)
-autoHopBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
-autoHopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoHopBtn.Text = "🤖 Auto Hop: BẬT"
-autoHopBtn.TextScaled = true
-autoHopBtn.Font = Enum.Font.GothamBold
-autoHopBtn.Parent = frame
-Instance.new("UICorner", autoHopBtn).CornerRadius = UDim.new(0, 8)
+-[span_8](start_span)- 2. AUTO EGG BUTTON[span_8](end_span)
+local eggBtn = Instance.new("TextButton")
+eggBtn.Size = UDim2.new(1, 0, 0, 35)
+eggBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+eggBtn.Text = "🥚 Auto Egg: BẬT"
+eggBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+eggBtn.Font = Enum.Font.GothamBold
+eggBtn.Parent = container
+Instance.new("UICorner", eggBtn)
 
--- Nút Hop thủ công
-local hopBtn = Instance.new("TextButton")
-hopBtn.Size = UDim2.new(0, 130, 0, 28)
-hopBtn.Position = UDim2.new(0, 10, 0, 168)
-hopBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-hopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-hopBtn.Text = "⚡ HOP NGAY"
-hopBtn.TextScaled = true
-hopBtn.Font = Enum.Font.GothamBold
-hopBtn.Parent = frame
-Instance.new("UICorner", hopBtn).CornerRadius = UDim.new(0, 8)
-
--- Nút Lock
-local lockBtn = Instance.new("TextButton")
-lockBtn.Size = UDim2.new(0, 60, 0, 28)
-lockBtn.Position = UDim2.new(0, 150, 0, 168)
-lockBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
-lockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-lockBtn.Text = "🔓"
-lockBtn.TextScaled = true
-lockBtn.Font = Enum.Font.GothamBold
-lockBtn.Parent = frame
-Instance.new("UICorner", lockBtn).CornerRadius = UDim.new(0, 8)
-
--- Divider
-local div1 = Instance.new("Frame")
-div1.Size = UDim2.new(1, -20, 0, 1)
-div1.Position = UDim2.new(0, 10, 0, 202)
-div1.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-div1.BorderSizePixel = 0
-div1.Parent = frame
-
--- =================== MỤC 2: EGG HATCH ===================
-local sec2Label = Instance.new("TextLabel")
-sec2Label.Size = UDim2.new(1, -20, 0, 20)
-sec2Label.Position = UDim2.new(0, 10, 0, 208)
-sec2Label.BackgroundTransparency = 1
-sec2Label.Text = "[ AUTO EGG HATCH ]"
-sec2Label.TextColor3 = Color3.fromRGB(255, 180, 0)
-sec2Label.TextScaled = true
-sec2Label.Font = Enum.Font.GothamBold
-sec2Label.TextXAlignment = Enum.TextXAlignment.Left
-sec2Label.Parent = frame
-
--- Egg status
-local eggStatus = Instance.new("TextLabel")
-eggStatus.Size = UDim2.new(1, -20, 0, 18)
-eggStatus.Position = UDim2.new(0, 10, 0, 230)
-eggStatus.BackgroundTransparency = 1
-eggStatus.Text = "🥚 Chờ..."
-eggStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
-eggStatus.TextScaled = true
-eggStatus.Font = Enum.Font.Gotham
-eggStatus.TextXAlignment = Enum.TextXAlignment.Left
-eggStatus.Parent = frame
-
--- Label chọn trứng
-local eggNameLabel = Instance.new("TextLabel")
-eggNameLabel.Size = UDim2.new(0, 80, 0, 24)
-eggNameLabel.Position = UDim2.new(0, 10, 0, 252)
-eggNameLabel.BackgroundTransparency = 1
-eggNameLabel.Text = "Tên trứng:"
-eggNameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-eggNameLabel.TextScaled = true
-eggNameLabel.Font = Enum.Font.Gotham
-eggNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-eggNameLabel.Parent = frame
-
--- Input tên trứng
-local eggNameBox = Instance.new("TextBox")
-eggNameBox.Size = UDim2.new(0, 120, 0, 24)
-eggNameBox.Position = UDim2.new(0, 92, 0, 252)
-eggNameBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-eggNameBox.TextColor3 = Color3.fromRGB(255, 220, 100)
-eggNameBox.Text = TARGET_EGG
-eggNameBox.TextScaled = true
-eggNameBox.Font = Enum.Font.Gotham
-eggNameBox.ClearTextOnFocus = false
-eggNameBox.Parent = frame
-Instance.new("UICorner", eggNameBox).CornerRadius = UDim.new(0, 6)
-Instance.new("UIStroke", eggNameBox).Color = Color3.fromRGB(200, 150, 0)
-
-eggNameBox.FocusLost:Connect(function()
-    TARGET_EGG = eggNameBox.Text
-    print("✅ Target egg: " .. TARGET_EGG)
-    eggStatus.Text = "🥚 Target: " .. TARGET_EGG
-end)
-
--- Danh sách trứng gợi ý
-local eggList = {
-    "Blossom Egg", "Rosette Egg", "Gildron's Egg",
-    "Coral Egg", "TideVex's Egg", "Giant Tree Egg",
-    "Frostwyrm's Egg", "Thunderclaw's Egg", "GrassEgg", "SwampEgg"
-}
-
-local eggListLabel = Instance.new("TextLabel")
-eggListLabel.Size = UDim2.new(1, -20, 0, 15)
-eggListLabel.Position = UDim2.new(0, 10, 0, 280)
-eggListLabel.BackgroundTransparency = 1
-eggListLabel.Text = "Chọn nhanh:"
-eggListLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-eggListLabel.TextScaled = true
-eggListLabel.Font = Enum.Font.Gotham
-eggListLabel.TextXAlignment = Enum.TextXAlignment.Left
-eggListLabel.Parent = frame
-
--- ScrollFrame cho egg list
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -20, 0, 60)
-scrollFrame.Position = UDim2.new(0, 10, 0, 296)
-scrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-scrollFrame.BorderSizePixel = 0
-scrollFrame.ScrollBarThickness = 3
-scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-scrollFrame.Parent = frame
-Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 6)
-
-local listLayout = Instance.new("UIListLayout", scrollFrame)
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Padding = UDim.new(0, 2)
-
-for i, name in ipairs(eggList) do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -4, 0, 20)
-    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    btn.Text = name
-    btn.TextScaled = true
-    btn.Font = Enum.Font.Gotham
-    btn.LayoutOrder = i
-    btn.Parent = scrollFrame
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-
-    btn.MouseButton1Click:Connect(function()
-        TARGET_EGG = name
-        eggNameBox.Text = name
-        eggStatus.Text = "🥚 Target: " .. name
-        print("✅ Chọn trứng: " .. name)
-        -- Highlight
-        for _, b in ipairs(scrollFrame:GetChildren()) do
-            if b:IsA("TextButton") then
-                b.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-                b.TextColor3 = Color3.fromRGB(220, 220, 220)
-            end
-        end
-        btn.BackgroundColor3 = Color3.fromRGB(200, 130, 0)
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    end)
-end
-
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, #eggList * 22)
-
--- Nút Auto Egg
-local autoEggBtn = Instance.new("TextButton")
-autoEggBtn.Size = UDim2.new(1, -20, 0, 28)
-autoEggBtn.Position = UDim2.new(0, 10, 0, 362)
-autoEggBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-autoEggBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoEggBtn.Text = "🥚 Auto Egg: BẬT"
-autoEggBtn.TextScaled = true
-autoEggBtn.Font = Enum.Font.GothamBold
-autoEggBtn.Parent = frame
-Instance.new("UICorner", autoEggBtn).CornerRadius = UDim.new(0, 8)
-
--- Divider cuối
-local div2 = Instance.new("Frame")
-div2.Size = UDim2.new(1, -20, 0, 1)
-div2.Position = UDim2.new(0, 10, 0, 396)
-div2.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-div2.BorderSizePixel = 0
-div2.Parent = frame
-
--- Version
-local verLabel = Instance.new("TextLabel")
-verLabel.Size = UDim2.new(1, 0, 0, 18)
-verLabel.Position = UDim2.new(0, 0, 0, 400)
-verLabel.BackgroundTransparency = 1
-verLabel.Text = "v1.0 | Catch a Monster"
-verLabel.TextColor3 = Color3.fromRGB(80, 80, 80)
-verLabel.TextScaled = true
-verLabel.Font = Enum.Font.Gotham
-verLabel.Parent = frame
-
--- =================== BUTTON LOGIC ===================
-local isLocked = false
-lockBtn.MouseButton1Click:Connect(function()
-    isLocked = not isLocked
-    lockBtn.Text = isLocked and "🔒" or "🔓"
-    lockBtn.BackgroundColor3 = isLocked and Color3.fromRGB(200,50,50) or Color3.fromRGB(200,150,0)
-end)
-
-autoHopBtn.MouseButton1Click:Connect(function()
-    AUTO_HOP = not AUTO_HOP
-    autoHopBtn.Text = AUTO_HOP and "🤖 Auto Hop: BẬT" or "🤖 Auto Hop: TẮT"
-    autoHopBtn.BackgroundColor3 = AUTO_HOP and Color3.fromRGB(0,150,200) or Color3.fromRGB(100,100,100)
-end)
-
-autoEggBtn.MouseButton1Click:Connect(function()
+eggBtn.MouseButton1Click:Connect(function()
     AUTO_EGG = not AUTO_EGG
-    autoEggBtn.Text = AUTO_EGG and "🥚 Auto Egg: BẬT" or "🥚 Auto Egg: TẮT"
-    autoEggBtn.BackgroundColor3 = AUTO_EGG and Color3.fromRGB(200,100,0) or Color3.fromRGB(100,100,100)
+    eggBtn.Text = AUTO_EGG and "🥚 Auto Egg: BẬT" or "🥚 Auto Egg: TẮT"
+    eggBtn.BackgroundColor3 = AUTO_EGG and Color3.fromRGB(200, 100, 0) or Color3.fromRGB(80, 80, 80)
 end)
 
--- =================== DRAG GUI ===================
-local dragging, dragStart, startPos = false, nil, nil
-frame.InputBegan:Connect(function(input)
-    if isLocked then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
-end)
-frame.InputChanged:Connect(function(input)
-    if isLocked or not dragging then return end
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        local d = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+d.X, startPos.Y.Scale, startPos.Y.Offset+d.Y)
-    end
-end)
-frame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-        savePos(frame.Position)
-    end
-end)
-
--- =================== LOGIC HOP ===================
-local function isRecentServer(id)
-    for _, v in ipairs(recentServers) do if v == id then return true end end
-    return false
-end
-local function addRecentServer(id)
-    table.insert(recentServers, 1, id)
-    if #recentServers > 3 then table.remove(recentServers) end
-end
-local function getServers()
-    local ok, result = pcall(function()
-        return game:HttpGet("https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100")
-    end)
-    if ok then return HttpService:JSONDecode(result) end
-    return nil
-end
-
-local function hasMonsterNearby()
-    local char = player.Character
-    if not char then return false end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return false end
-    for _, folder in ipairs({
-        workspace:FindFirstChild("Monsters"),
-        workspace:FindFirstChild("ClientMonsters"),
-        workspace:FindFirstChild("Pets"),
-        workspace:FindFirstChild("ClientPets"),
-    }) do
-        if folder then
-            for _, obj in ipairs(folder:GetDescendants()) do
-                if obj:IsA("Model") then
-                    local nameMatch = string.find(obj.Name, "Monster_") ~= nil
-                    local hasHum = obj:FindFirstChildOfClass("Humanoid") ~= nil
-                    if nameMatch or hasHum then
-                        local r = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Root") or obj.PrimaryPart
-                        if r then
-                            if (root.Position - r.Position).Magnitude <= DETECT_RADIUS then return true end
-                        else
-                            for _, part in ipairs(obj:GetChildren()) do
-                                if part:IsA("BasePart") then
-                                    if (root.Position - part.Position).Magnitude <= DETECT_RADIUS then return true end
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
-
-local isHopping = false
-local function hopServer()
-    if isHopping then return end
-    isHopping = true
-    hopBtn.BackgroundColor3 = Color3.fromRGB(150,150,150)
-    hopBtn.Text = "⏳ Đang tìm..."
-    local data = getServers()
-    if not data or not data.data then
-        hopStatus.Text = "❌ Lỗi lấy server!"
-        hopBtn.BackgroundColor3 = Color3.fromRGB(0,180,0)
-        hopBtn.Text = "⚡ HOP NGAY"
-        isHopping = false
-        return
-    end
-    addRecentServer(game.JobId)
-    for _, server in ipairs(data.data) do
-        if server.playing < MIN_PLAYERS and server.id ~= game.JobId and not isRecentServer(server.id) then
-            hopStatus.Text = "✅ Hop → "..server.playing.." người"
-            task.wait(1)
-            TeleportService:TeleportToPlaceInstance(placeId, server.id, player)
-            return
-        end
-    end
-    hopStatus.Text = "⚠️ Không tìm thấy server!"
-    hopBtn.BackgroundColor3 = Color3.fromRGB(0,180,0)
-    hopBtn.Text = "⚡ HOP NGAY"
-    isHopping = false
-end
-
-hopBtn.MouseButton1Click:Connect(hopServer)
-
--- Auto hop loop
-task.spawn(function()
-    while task.wait(CHECK_INTERVAL) do
-        if not AUTO_HOP or isHopping then continue end
-        local nearby = hasMonsterNearby()
-        if nearby then
-            monStatus.Text = "🐉 Có monster! Đang đánh..."
-            monStatus.TextColor3 = Color3.fromRGB(255,100,100)
-        else
-            monStatus.Text = "😴 Không có monster → Hop!"
-            monStatus.TextColor3 = Color3.fromRGB(255,200,0)
-            hopStatus.Text = "🔄 Auto hop..."
-            task.wait(2)
-            hopServer()
-        end
-    end
-end)
-
--- =================== LOGIC EGG ===================
+-[span_9](start_span)[span_10](start_span)- =================== LOGIC AUTO EGG[span_9](end_span)[span_10](end_span) ===================
 local function setupEgg()
     local ok1, EggSys = pcall(function() return require(RS.CommonLogic.Egg.EggSystem) end)
     local ok2, EggSel = pcall(function() return require(RS.ClientLogic.Egg.EggSelectView) end)
     local ok3, IBag   = pcall(function() return require(RS.ClientLogic.Item.ItemBagView) end)
     local ok4, CfgEgg = pcall(function() return require(RS:FindFirstChild("CfgEgg", true)) end)
     local ok5, VUtil  = pcall(function() return require(RS:FindFirstChild("ViewUtil", true)) end)
-    if ok1 and ok2 and ok3 and ok4 and ok5 then
-        return EggSys, EggSel, IBag, CfgEgg, VUtil
-    end
+    if ok1 and ok2 and ok3 and ok4 and ok5 then return EggSys, EggSel, IBag, CfgEgg, VUtil end
     return nil
-end
-
-local function getTargetEggId(gp, IBag, CfgEgg)
-    local list = IBag._getSortedEggTmplIdList(gp)
-    if #list == 0 then return nil end
-    if TARGET_EGG and TARGET_EGG ~= "" then
-        for _, id in ipairs(list) do
-            local cfg = CfgEgg.Tmpls[id]
-            if cfg and string.find(string.lower(cfg.Name or ""), string.lower(TARGET_EGG)) then
-                return id
-            end
-        end
-        return nil
-    end
-    return list[1]
 end
 
 local function runEgg()
     local EggSys, EggSel, IBag, CfgEgg, VUtil = setupEgg()
-    if not EggSys then eggStatus.Text = "❌ Lỗi EggSystem!"; return end
+    if not EggSys then return end
     local gp = EggSel._GamePlayer
-    if not gp then eggStatus.Text = "❌ Lỗi GamePlayer!"; return end
+    if not gp then return end
 
     for slot = 1, 5 do
         pcall(function()
             if not gp.egg:IsHatchUnlocked(slot) then return end
             local eggId = gp.egg:GetHatchEggTmplId(slot)
             if eggId then
-                local startTick = gp.egg:GetHatchEggStartTick(slot) or 0
+                [span_11](start_span)local startTick = gp.egg:GetHatchEggStartTick(slot) or 0[span_11](end_span)
                 local hatchTime = CfgEgg.Tmpls[eggId].HatchTime
                 local timeLeft = startTick + hatchTime - os.time()
                 if timeLeft <= 0 then
-                    eggStatus.Text = "🐣 Slot "..slot.." nở! Lấy..."
-                    VUtil.DoRequest(EggSys.ClientHatchTaken, slot)
+                    [span_12](start_span)VUtil.DoRequest(EggSys.ClientHatchTaken, slot)[span_12](end_span)
                     task.wait(0.5)
-                    local newId = getTargetEggId(gp, IBag, CfgEgg)
-                    if newId then
-                        local name = CfgEgg.Tmpls[newId].Name or tostring(newId)
-                        eggStatus.Text = "🥚 Đặt ["..name.."] slot "..slot
-                        VUtil.DoRequest(EggSys.ClientHatchStart, slot, newId)
-                    end
-                else
-                    eggStatus.Text = "⏳ Slot "..slot.." còn "..math.floor(timeLeft).."s"
-                end
-            else
-                local newId = getTargetEggId(gp, IBag, CfgEgg)
-                if newId then
-                    local name = CfgEgg.Tmpls[newId].Name or tostring(newId)
-                    eggStatus.Text = "🥚 Đặt ["..name.."] slot "..slot
-                    VUtil.DoRequest(EggSys.ClientHatchStart, slot, newId)
-                else
-                    eggStatus.Text = "❌ Không tìm thấy: "..TARGET_EGG
                 end
             end
         end)
-        task.wait(0.3)
     end
 end
 
+-- VÒNG LẶP CHECK TRỨNG THEO THỜI GIAN ĐÃ CHỌN
 task.spawn(function()
-    task.wait(3)
-    while task.wait(EGG_INTERVAL) do
-        if AUTO_EGG then pcall(runEgg) end
+    while true do
+        task.wait(EGG_INTERVAL) -- Sử dụng thời gian từ UI
+        if AUTO_EGG then
+            pcall(runEgg)
+        end
     end
 end)
 
-print("✅ NGUYEN CUTO đã sẵn sàng!")
+-- TỰ ĐỘNG LƯU VỊ TRÍ KHI KÉO
+frame:GetPropertyChangedSignal("Position"):Connect(function()
+    savePos(frame.Position)
+end)
+
+print("✅ NGUYEN CUTO v2.0 ĐÃ SẴN SÀNG!")
