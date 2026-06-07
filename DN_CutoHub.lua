@@ -26,7 +26,7 @@ local autoHop    = true
 local autoAttack = true
 local recent     = {}
 local startTick  = tick()
-local FARM_POS   = Vector3.new(2915.9, -79.8, 2018.5)
+local FARM_POS   = Vector3.new(820.2, -45.6, -3508.0)
 
 -- ─── DANH SÁCH CODE ──────────────────────────────────────────
 local CODES = {
